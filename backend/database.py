@@ -1,8 +1,9 @@
 from sqlmodel import SQLModel, create_engine, Session
 from dotenv import load_dotenv
+from pathlib import Path
 import os
 
-load_dotenv()
+load_dotenv(Path(__file__).parent.parent / ".env")  # sobe um nível até a raiz
 
 DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/mnemo")
 
