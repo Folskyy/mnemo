@@ -1,262 +1,91 @@
-# Roadmap — SaaS de Organização de Estudos + Dashboard Inteligente
+**key-words**: cognitive augmentation; personal knowledge systems; semantic memory systems; adaptive learning systems.
 
-## Objetivo do projeto
+> uma extensão cognitiva pessoal.
 
-Desenvolver um SaaS que:
+# Índice
+1.1 [Objetivo do projeto](#objetivo-do-projeto)
+1.2 [Arquitetura](#visão-macro-da-arquitetura)
+1.3 [Features](#features)
+1.4 [Ordem ideal de implementação](#ordem-ideal-de-implementação)
+1.5 [Entregas](#entregas)
+
+---
+
+# Informações do projeto
+
+---
+
+## Objetivo
+Desenvolver um sistema que:
 
 * organiza estudos automaticamente,
-* acompanha métricas pessoais,
+* acompanha métricas cognitivas,
+* processa materiais,
+* utiliza RAG local,
 * utiliza IA para adaptação,
-* processa materiais de estudo,
 * gera insights e revisões.
 
-Arquitetura inicialmente orientada para:
+---
 
-* desenvolvimento rápido,
-* vibe coding,
-* modularidade,
-* futura integração com RAG e agentes.
+## Visão macro da arquitetura
 
 ---
 
-# Visão macro da arquitetura
-
-## Frontend
-
-* Next.js
-* Tailwind
-* shadcn/ui
-* Recharts
-
-## Backend
-
-* Supabase
-
-  * Auth
-  * PostgreSQL
-  * Storage
-  * Edge Functions
-
-## IA
-
-* OpenAI API
-* embeddings
-* RAG
-
-## Processamento assíncrono
-
-* Trigger.dev
-  ou
-* BullMQ + Redis
-
-## Deploy
-
-* Vercel
+### frontend
+- Next.js (App Router)
+- Tailwind
+- shadcn/ui
+- Recharts
+- ESLint + Prettier
 
 ---
 
-# Roadmap geral
+### Backend
+- PostgreSQL local
+- ChromaDB
+- Prisma ORM
+- FastAPI
+- Ollama
 
-# Fase 0 — Definição do produto
-
-## Objetivos
-
-Definir:
-
-* público-alvo,
-* funcionalidades centrais,
-* escopo do MVP,
-* diferenciais.
+*Por enquanto, nenhum Processamento assíncrono nem deploy*
 
 ---
 
-## Entregáveis
+### Estrutura do projeto
 
-### Documento de visão
+```txt id="ew1ku6"
+/frontend
+  /app
+  /components
+  /features
 
-Definir:
+/backend
+  /api
+  /services
+  /rag
+  /agents
+  /analytics
+  /parsers
 
-* problema resolvido,
-* personas,
-* fluxo principal,
-* proposta de valor.
+/data
+  /documents
+  /embeddings
+  /metrics
+  /database
 
----
-
-## Definir MVP
-
-MVP deve conter apenas:
-
-* autenticação,
-* dashboard,
-* disciplinas,
-* calendário,
-* cronograma automático,
-* métricas básicas.
-
----
-
-## Definir arquitetura inicial
-
-### Estrutura sugerida
-
-```txt
-/apps
-  /web
-
-/packages
-  /ui
-  /ai
-  /db
-  /core
+/models
 ```
-
 ---
 
-# Fase 1 — Fundação do projeto
-
-## Objetivos
-
-Criar infraestrutura base.
-
----
-
-## Tasks
-
-### Setup do frontend
-
-* Next.js
-* Tailwind
-* shadcn/ui
-* ESLint
-* Prettier
-
----
-
-### Setup backend
-
-* Supabase project
-* PostgreSQL schema
-* Auth
-
----
-
-### Setup ambiente
-
-* variáveis de ambiente,
-* CI/CD,
-* deploy Vercel.
-
----
-
-## Estrutura inicial de banco
-
-### Usuários
-
+### Estrutura inicial de banco
 ```sql
-users
+categories        -- árvore hierárquica livre (auto-referência)
+study_sessions    -- sessões com timer, duração, produtividade
+calendar_events   -- provas, metas, entregas
+materials         -- arquivos e links taggeados
+metrics           -- dados derivados das sessões
 ```
-
-### Disciplinas
-
-```sql
-subjects
-```
-
-### Sessões de estudo
-
-```sql
-study_sessions
-```
-
-### Eventos
-
-```sql
-calendar_events
-```
-
-### Materiais
-
-```sql
-materials
-```
-
-### Métricas
-
-```sql
-metrics
-```
-
----
-
-# Fase 2 — Sistema de autenticação
-
-## Objetivos
-
-Permitir onboarding completo.
-
----
-
-## Tasks
-
-### Auth
-
-* login,
-* signup,
-* reset password,
-* OAuth Google.
-
----
-
-### Perfil
-
-* curso,
-* semestre,
-* metas,
-* disponibilidade semanal.
-
----
-
-## Fluxo esperado
-
-```txt
-Cadastro
-→ onboarding
-→ criação de matérias
-→ geração inicial do cronograma
-```
-
----
-
-# Fase 3 — Dashboard base
-
-## Objetivos
-
-Criar visualização principal do sistema.
-
----
-
-## Componentes
-
-### Dashboard principal
-
-* horas estudadas,
-* progresso semanal,
-* próximas provas,
-* tarefas pendentes.
-
----
-
-### Gráficos
-
-* heatmap,
-* evolução,
-* distribuição por matéria.
-
----
-
-## Métricas iniciais
-
+**Métricas iniciais**:
 * tempo estudado,
 * frequência,
 * consistência,
@@ -264,27 +93,18 @@ Criar visualização principal do sistema.
 
 ---
 
-# Fase 4 — Calendário e planejamento
-
-## Objetivos
-
-Construir sistema de organização.
+## Features
 
 ---
 
-## Funcionalidades
-
-### Calendário
-
-* eventos,
-* provas,
-* tarefas,
-* revisões.
-
+### O que eu faço agora?
+- Sugerir tarefas/atividades rapidamente com base nas prioridades descritas
+    - auxilia o usuário a ter um norte do que fazer (muito útil em tempos caóticos)
+- sugestões de inicio de tarefas
+    - Normalmente é a trava mais marcante
 ---
 
 ### Cronograma automático
-
 Inputs:
 
 * disponibilidade,
@@ -297,26 +117,6 @@ Outputs:
 * plano semanal.
 
 ---
-
-## Algoritmo inicial
-
-Começar simples:
-
-```txt
-peso = urgência × dificuldade × prioridade
-```
-
----
-
-# Fase 5 — Sistema de sessões de estudo
-
-## Objetivos
-
-Instrumentar comportamento real.
-
----
-
-## Funcionalidades
 
 ### Timer
 
@@ -338,7 +138,7 @@ Registrar:
 
 ---
 
-## Métricas derivadas
+### Métricas derivadas
 
 * horários mais produtivos,
 * tempo médio foco,
@@ -346,94 +146,7 @@ Registrar:
 
 ---
 
-# Fase 6 — Upload e processamento de materiais
-
-## Objetivos
-
-Transformar PDFs em dados utilizáveis.
-
----
-
-## Funcionalidades
-
-### Upload
-
-* PDF,
-* DOCX,
-* slides.
-
----
-
-### Parsing
-
-Extrair:
-
-* texto,
-* tópicos,
-* capítulos,
-* palavras-chave.
-
----
-
-## Pipeline
-
-```txt
-upload
-→ extração
-→ chunking
-→ embeddings
-→ storage vetorial
-```
-
----
-
-# Fase 7 — Integração RAG
-
-## Objetivos
-
-Criar sistema contextual inteligente.
-
----
-
-# Arquitetura RAG
-
-## Ingestão
-
-* chunking semântico,
-* embeddings,
-* metadata.
-
----
-
-## Metadata importante
-
-```json
-{
-  "subject": "",
-  "difficulty": "",
-  "source": "",
-  "created_at": "",
-  "tags": []
-}
-```
-
----
-
-## Banco vetorial
-
-Sugestões:
-
-* pgvector,
-* Pinecone,
-* Weaviate.
-
-pgvector provavelmente basta inicialmente.
-
----
-
-# Funcionalidades RAG
-
-## Chat contextual
+### Chat contextual
 
 Usuário pergunta:
 
@@ -441,7 +154,7 @@ Usuário pergunta:
 
 ---
 
-## Geração contextual
+### Geração contextual
 
 * resumos,
 * flashcards,
@@ -450,190 +163,74 @@ Usuário pergunta:
 
 ---
 
-## Busca semântica
+### Busca semântica
 
 * localizar conceitos,
 * relacionar conteúdos.
 
 ---
 
-# Fase 8 — IA adaptativa
+### Grafo de conhecimento
 
-## Objetivos
+Conectar:
 
-Transformar analytics em adaptação.
+* disciplinas,
+* ideias,
+* conceitos.
 
 ---
 
-## Inputs
+### IA adaptativa
+- Transformar analytics em adaptação.
 
+**Inputs**:
 * desempenho,
 * frequência,
 * revisões,
 * tempo real,
 * horário.
 
----
-
-## Outputs
-
+**Outputs**:
 * reorganização de agenda,
 * alertas,
 * recomendações.
 
----
+**Exemplos**:
 
-## Exemplos
+```txt id="1g8ap8"
+Seu foco cai após 90 minutos contínuos.
 
-```txt
 Você revisa pouco conteúdos de alta dificuldade.
 
 Seu desempenho cai após 22h.
 
 Você mantém maior retenção em sessões curtas.
+
+Você retém melhor conteúdos matemáticos pela manhã.
+
+Você revisa pouco tópicos abstratos.
 ```
-
 ---
 
-# Fase 9 — Sistema de revisão espaçada
+### Sistema de revisão espaçada
 
-## Objetivos
+- Criar retenção de longo prazo.
 
-Criar retenção de longo prazo.
-
----
-
-## Funcionalidades
-
+**Funcionalidades**:
 * revisão automática,
 * flashcards,
 * repetição espaçada.
 
----
-
-## Algoritmos possíveis
-
+**Algoritmos possíveis**:
 * SM-2,
 * FSRS futuramente.
 
 ---
 
-# Fase 10 — Observabilidade
-
-## Objetivos
-
-Entender comportamento do sistema.
+## Ordem ideal de implementação
 
 ---
-
-## Logs
-
-* prompts,
-* geração IA,
-* erros,
-* tempo resposta.
-
----
-
-## Métricas
-
-* custo IA,
-* latência,
-* uso funcionalidades.
-
----
-
-# Fase 11 — Monetização
-
-## Modelo simples
-
-Freemium.
-
----
-
-## Free
-
-* dashboard básico,
-* poucas gerações IA.
-
----
-
-## Premium
-
-* RAG completo,
-* revisões avançadas,
-* analytics adaptativo,
-* upload expandido.
-
----
-
-# Estrutura ideal para alimentar RAG
-
-Você pode estruturar documentos internos assim:
-
-```txt
-/docs
-  /vision
-  /architecture
-  /database
-  /features
-  /flows
-  /prompts
-  /agents
-  /rag
-  /ui
-```
-
----
-
-# Documentos importantes para o RAG
-
-## 1. Product Vision
-
-Objetivo do produto.
-
----
-
-## 2. Architecture
-
-Fluxos e componentes.
-
----
-
-## 3. Database Schema
-
-Tabelas e relações.
-
----
-
-## 4. Feature Specs
-
-Cada funcionalidade separada.
-
----
-
-## 5. Prompt Engineering
-
-Prompts reutilizáveis.
-
----
-
-## 6. Agent Behaviors
-
-Regras dos agentes.
-
----
-
-## 7. UI Patterns
-
-Padronização visual.
-
----
-
-# Ordem ideal de implementação
-
-## Prioridade alta
-
+**Prioridade alta**:
 1. Auth
 2. Dashboard
 3. Calendário
@@ -642,8 +239,7 @@ Padronização visual.
 
 ---
 
-## Prioridade média
-
+**Prioridade média**:
 6. Upload
 7. Parsing
 8. RAG
@@ -651,32 +247,29 @@ Padronização visual.
 
 ---
 
-## Prioridade futura
-
+**Prioridade futura**:
 10. Adaptação inteligente
 11. Revisão espaçada avançada
 12. Multiagentes
 
 ---
 
-# Meta realista
-
-## Em 30 dias
-
-MVP funcional.
-
+## Entregas
 ---
+### Fase 0 — Definição do produto
+- **Problema resolvido**: Pessoas sem estrutura externa de aprendizado (escola fraca, autodidata, ingressante no mercado) não conseguem criar e manter um sistema próprio de organização e desenvolvimento. O app cria essa estrutura de forma adaptativa, com base no comportamento real do usuário e em metodologias validadas pela ciência.
 
-## Em 60–90 dias
+- **Público-alvo**: Qualquer pessoa que precise organizar o próprio aprendizado e desenvolvimento sem depender de estrutura externa — universitários, autodidatas, alunos de ensino médio, ingressantes no mercado. Denominador comum: ausência de sistema consolidado, necessidade de criar a própria disciplina.
 
-Produto já tecnicamente impressionante.
+- **Plataforma inicial**: Desktop web
 
+- **Proposta de valor**: Não é um app de tarefas nem um calendário. É um sistema que aprende com o comportamento do usuário, sugere ajustes baseados em dados e ciência, e adapta a rotina de forma gradual e não invasiva.
+
+- **Diferenciais reais**:
+    - Tags hierárquicas para separar contextos sem perder a visão global
+    - Experimentos de método opt-in com coleta de resultado e aprendizado persistente no perfil
+    - Home que resolve "o que eu faço agora" em menos de 10 segundos
+    - Linguagem agnóstica (metas, eventos) em vez de vocabulário puramente escolar
+
+    - Auth → onboarding rápido (áreas + disponibilidade semanal) → home com urgências/pendências/sugestões → timer de sessão com registro → gráfico de consistência semanal.
 ---
-
-## Em 6 meses
-
-Sistema realmente competitivo se:
-
-* UX for boa,
-* insights forem úteis,
-* adaptação funcionar bem.
