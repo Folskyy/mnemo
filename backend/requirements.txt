@@ -1,0 +1,10 @@
+fastapi
+uvicorn[standard]
+sqlmodel
+psycopg2-binary
+alembic
+python-dotenv
+chromadb
+ollama
+pypdf2
+python-docx
