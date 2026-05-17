@@ -1,3 +1,4 @@
+# Mnemo
 **key-words**: cognitive augmentation; personal knowledge systems; semantic memory systems; adaptive learning systems.
 
 > uma extensão cognitiva pessoal.
@@ -41,10 +42,10 @@ Desenvolver um sistema que:
 ---
 
 ### Backend
-- PostgreSQL local
-- ChromaDB
-- Prisma ORM
 - FastAPI
+- PostgreSQL local
+- SQLModel
+- ChromaDB
 - Ollama
 
 *Por enquanto, nenhum Processamento assíncrono nem deploy*
