@@ -1,12 +1,18 @@
 dev:
-	cd frontend && npm run dev & uvicorn backend.main:app --reload
+	docker compose up -d
+	cd frontend && npm run dev & cd backend && uvicorn main:app --reload
+stop:
+	docker compose down
 
 install:
 	cd frontend && npm install
 	pip install -r backend/requirements.txt
 
 db:
-	prisma migrate dev
+	docker compose up -d postgres
+	sleep 2
+	python backend/database.py
 
 reset:
-	prisma migrate reset
+	docker compose down -v
+	docker compose up -d
