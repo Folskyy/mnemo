@@ -1,12 +1,14 @@
 dev:
 	docker compose up -d
-	cd frontend && npm run dev & cd backend && uvicorn main:app --reload
+	cd frontend && npm run dev & cd backend && ../.venv/bin/uvicorn main:app --reload
+
 stop:
 	docker compose down
 
 install:
+	python3 -m venv .venv
+	.venv/bin/pip install -r backend/requirements.txt
 	cd frontend && npm install
-	pip install -r backend/requirements.txt
 
 db:
 	docker compose up -d postgres
