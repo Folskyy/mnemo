@@ -7,8 +7,9 @@
 1.1 [Objetivo do projeto](#objetivo-do-projeto)
 1.2 [Arquitetura](#visão-macro-da-arquitetura)
 1.3 [Features](#features)
-1.4 [Ordem ideal de implementação](#ordem-ideal-de-implementação)
-1.5 [Entregas](#entregas)
+2.1 [Ordem ideal de implementação](#ordem-ideal-de-implementação)
+2.2 [Entregas](#entregas)
+3. [Como executar](#como-executar)
 
 ---
 
@@ -274,3 +275,10 @@ Você revisa pouco tópicos abstratos.
 
     - Auth → onboarding rápido (áreas + disponibilidade semanal) → home com urgências/pendências/sugestões → timer de sessão com registro → gráfico de consistência semanal.
 ---
+
+## Como executar?
+```sh
+make install   # uma vez só
+make dev       # sobe tudo — postgres, chroma, fastapi, next.js
+make stop      # derruba os containers quando terminar
+```
