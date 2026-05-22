@@ -1,29 +1,30 @@
-VENV=.venv
-PYTHON=$(VENV)/bin/python
-PIP=$(VENV)/bin/pip
-UVICORN=$(VENV)/bin/uvicorn
+.PHONY: up down clean install status logs reset
 
-dev:
-	docker compose up -d
-	cd frontend && npm run dev & \
-	cd backend && ../$(UVICORN) main:app --reload
+up:
+	docker compose up -d --build
+	@echo "\n=============================================="
+	@echo "Services started successfully!"
+	@echo "  Frontend:    http://localhost:3000"
+	@echo "  Backend API: http://localhost:8000"
+	@echo "  ChromaDB:    http://localhost:8001"
+	@echo "  Ollama:      http://localhost:11435"
+	@echo "==============================================\n"
 
-stop:
+down:
 	docker compose down
 
+logs:
+	docker compose logs -f $(service)
+
+status:
+	docker compose ps
+
+clean:
+	docker compose down -v --rmi all --remove-orphans
+
 install:
-	python3 -m venv $(VENV)
-	$(PIP) install -r backend/requirements.txt
+	python3 -m venv .venv
+	.venv/bin/pip install -r backend/requirements.txt
 	cd frontend && npm install
 
-db:
-	@echo "\nPython:"
-	@$(PYTHON) -c "import sys; print(sys.executable)"
-
-	docker compose up -d postgres
-	sleep 2
-	$(PYTHON) backend/database.py
-
-reset:
-	docker compose down -v
-	docker compose up -d
+reset: clean up
