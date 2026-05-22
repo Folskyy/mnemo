@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:16
+    container_name: postgres
     environment:
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
@@ -9,10 +10,83 @@ services:
       - "5432:5432"
     volumes:
       - ./data/database:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d mnemo"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   chromadb:
-    image: chromadb/chroma:latest
+    image: chromadb/chroma:0.5.23
+    container_name: chromadb
     ports:
       - "8001:8000"
     volumes:
       - ./data/embeddings:/chroma/chroma
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: ollama
+    ports:
+      - "11435:11434"  # expõe na 11435 para não conflitar
+    volumes:
+      - ./models:/root/.ollama
+    # Se tiver GPU NVIDIA, descomente:
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices:
+    #         - driver: nvidia
+    #           count: 1
+    #           capabilities: [gpu]
+
+  ollama-pull:
+    image: ollama/ollama:latest
+    container_name: ollama-pull
+    environment:
+      - OLLAMA_HOST=ollama:11434
+    entrypoint: [ "/bin/sh", "-c" ]
+    command: >
+      "echo 'Aguardando Ollama...' &&
+      until ollama list > /dev/null 2>&1; do sleep 2; done &&
+      echo 'Puxando nomic-embed-text...' &&
+      ollama pull nomic-embed-text &&
+      echo 'Modelos prontos:' &&
+      ollama list"
+    depends_on:
+      - ollama
+
+  api:
+    build: ./backend
+    container_name: api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./backend:/app
+      - ./data:/app/data
+    environment:
+      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mnemo
+      CHROMA_HOST: chromadb
+      CHROMA_PORT: 8000
+      OLLAMA_HOST: ollama
+      OLLAMA_PORT: 11434
+    depends_on:
+      postgres:
+        condition: service_healthy
+      chromadb:
+        condition: service_started
+      ollama:
+        condition: service_started
+
+  frontend:
+    build: ./frontend
+    container_name: frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - api
