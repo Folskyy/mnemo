@@ -1,2 +1,23 @@
+# Environment variables
+.env
 *.env
-*/__pycache__/*
+
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+
+# Node / Next.js
+node_modules/
+.next/
+out/
+build/
+
+# Local data & models (Docker mounts)
+data/
+models/
+
+# System files
+.DS_Store
