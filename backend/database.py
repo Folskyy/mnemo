@@ -5,7 +5,7 @@ import os
 
 load_dotenv(Path(__file__).parent.parent / ".env")  # sobe um nível até a raiz
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@localhost:5432/mnemo")
+DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://postgres:postgres@postgres:5432/mnemo")
 
 engine = create_engine(DATABASE_URL, echo=True)
 
