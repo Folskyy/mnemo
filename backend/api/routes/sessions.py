@@ -5,7 +5,7 @@ from datetime import datetime, UTC
 from pydantic import BaseModel
 
 from database import get_session
-from models import StudySession
+from schemas import StudySession
 
 router = APIRouter(prefix="/sessions", tags=["sessions"])
 

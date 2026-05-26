@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlmodel import Session
 from datetime import datetime, UTC
 from database import get_session
-from models.material import Material
+from schemas.material import Material
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 

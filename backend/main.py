@@ -2,7 +2,7 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
-import models  # Ensures all tables (including StudySession) are registered in SQLModel
+import schemas  # Ensures all tables (including StudySession) are registered in SQLModel
 from database import create_tables
 from api.routes.materials import router as materials_router
 from api.routes.chat import router as chat_router
