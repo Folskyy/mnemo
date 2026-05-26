@@ -7,8 +7,7 @@
 1.1 [Objetivo do projeto](#objetivo-do-projeto)
 1.2 [Arquitetura](#visão-macro-da-arquitetura)
 1.3 [Features](#features)
-2.1 [Ordem ideal de implementação](#ordem-ideal-de-implementação)
-2.2 [Entregas](#entregas)
+2 [Ordem ideal de implementação](#ordem-ideal-de-implementação)
 3. [Como executar](#como-executar)
 
 ---
@@ -256,29 +255,7 @@ Você revisa pouco tópicos abstratos.
 
 ---
 
-## Entregas
----
-### Fase 0 — Definição do produto
-- **Problema resolvido**: Pessoas sem estrutura externa de aprendizado (escola fraca, autodidata, ingressante no mercado) não conseguem criar e manter um sistema próprio de organização e desenvolvimento. O app cria essa estrutura de forma adaptativa, com base no comportamento real do usuário e em metodologias validadas pela ciência.
-
-- **Público-alvo**: Qualquer pessoa que precise organizar o próprio aprendizado e desenvolvimento sem depender de estrutura externa — universitários, autodidatas, alunos de ensino médio, ingressantes no mercado. Denominador comum: ausência de sistema consolidado, necessidade de criar a própria disciplina.
-
-- **Plataforma inicial**: Desktop web
-
-- **Proposta de valor**: Não é um app de tarefas nem um calendário. É um sistema que aprende com o comportamento do usuário, sugere ajustes baseados em dados e ciência, e adapta a rotina de forma gradual e não invasiva.
-
-- **Diferenciais reais**:
-    - Tags hierárquicas para separar contextos sem perder a visão global
-    - Experimentos de método opt-in com coleta de resultado e aprendizado persistente no perfil
-    - Home que resolve "o que eu faço agora" em menos de 10 segundos
-    - Linguagem agnóstica (metas, eventos) em vez de vocabulário puramente escolar
-
-    - Auth → onboarding rápido (áreas + disponibilidade semanal) → home com urgências/pendências/sugestões → timer de sessão com registro → gráfico de consistência semanal.
----
-
 ## Como executar?
 ```sh
-make install   # uma vez só
-make dev       # sobe tudo — postgres, chroma, fastapi, next.js
-make stop      # derruba os containers quando terminar
+make up
 ```
