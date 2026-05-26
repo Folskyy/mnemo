@@ -11,7 +11,7 @@ services:
     volumes:
       - ./data/database:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres -d mnemo"]
+      test: [ "CMD-SHELL", "pg_isready -U postgres -d mnemo" ]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -28,9 +28,15 @@ services:
     image: ollama/ollama:latest
     container_name: ollama
     ports:
-      - "11435:11434"  # expõe na 11435 para não conflitar
+      - "11435:11434" # expõe na 11435 para não conflitar
     volumes:
       - ./models:/root/.ollama
+    healthcheck:
+      test: [ "CMD", "ollama", "list" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
     # Se tiver GPU NVIDIA, descomente:
     # deploy:
     #   resources:
@@ -40,21 +46,14 @@ services:
     #           count: 1
     #           capabilities: [gpu]
 
-  ollama-pull:
-    image: ollama/ollama:latest
-    container_name: ollama-pull
-    environment:
-      - OLLAMA_HOST=ollama:11434
-    entrypoint: [ "/bin/sh", "-c" ]
-    command: >
-      "echo 'Aguardando Ollama...' &&
-      until ollama list > /dev/null 2>&1; do sleep 2; done &&
-      echo 'Puxando nomic-embed-text...' &&
-      ollama pull nomic-embed-text &&
-      echo 'Modelos prontos:' &&
-      ollama list"
-    depends_on:
-      - ollama
+    # ollama-pull:
+    #   image: ollama/ollama:latest
+    #   container_name: ollama-pull
+    #   entrypoint: [ "/bin/sh", "-c" ]
+    #   command: >
+    #     "echo 'Aguardando Ollama...' && until ollama list > /dev/null 2>&1; do sleep 2; done && echo 'Puxando nomic-embed-text...' && ollama pull nomic-embed-text && echo 'Modelos prontos:' && ollama list"
+    #   depends_on:
+    #     - ollama
 
   api:
     build: ./backend
@@ -64,19 +63,15 @@ services:
     volumes:
       - ./backend:/app
       - ./data:/app/data
-    environment:
-      DATABASE_URL: postgresql://postgres:postgres@postgres:5432/mnemo
-      CHROMA_HOST: chromadb
-      CHROMA_PORT: 8000
-      OLLAMA_HOST: ollama
-      OLLAMA_PORT: 11434
     depends_on:
       postgres:
         condition: service_healthy
       chromadb:
         condition: service_started
       ollama:
-        condition: service_started
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
 
   frontend:
     build: ./frontend
@@ -86,7 +81,5 @@ services:
     volumes:
       - ./frontend:/app
       - /app/node_modules
-    environment:
-      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - api
