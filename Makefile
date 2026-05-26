@@ -7,7 +7,7 @@ up:
 	@echo "  Frontend:    http://localhost:3000"
 	@echo "  Backend API: http://localhost:8000"
 	@echo "  ChromaDB:    http://localhost:8001"
-	@echo "  Ollama:      http://localhost:11435"
+	@echo "  Ollama:      http://localhost:11435" -local-
 	@echo "==============================================\n"
 
 down:
@@ -18,6 +18,10 @@ logs:
 
 status:
 	docker compose ps
+
+clear-db:
+	sudo rm -rf data/*
+	docker compose up -d --build --remove-orphans postgres chromadb
 
 clean:
 	docker compose down -v --rmi all --remove-orphans
