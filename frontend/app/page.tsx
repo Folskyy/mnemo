@@ -168,6 +168,13 @@ export default function Home() {
               <Sparkles className="h-4 w-4 text-blue-400 animate-pulse" />
               <span>Mnemo Chat</span>
             </Link>
+            <Link
+              href="/pomodoro"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-all duration-200 flex items-center gap-1.5"
+            >
+              <Clock className="h-4 w-4 text-indigo-400" />
+              <span>Pomodoro</span>
+            </Link>
           </nav>
 
           <div className="flex items-center space-x-3">
