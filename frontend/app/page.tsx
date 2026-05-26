@@ -1,29 +1,48 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { 
-  Activity, 
-  BookOpen, 
-  Calendar as CalendarIcon, 
-  CheckCircle2, 
-  Clock, 
-  Cpu, 
-  Database, 
-  FileText, 
-  HelpCircle, 
-  Info, 
-  Layers, 
-  Search, 
-  Sparkles, 
+import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/navigation";
+import {
+  Activity,
+  BookOpen,
+  Calendar as CalendarIcon,
+  CheckCircle2,
+  Clock,
+  Cpu,
+  Database,
+  FileText,
+  HelpCircle,
+  Info,
+  Layers,
+  Search,
+  Sparkles,
   TrendingUp,
-  Upload, 
-  XCircle 
+  Upload,
+  XCircle
 } from "lucide-react";
 
+type UploadStatus = "idle" | "uploading" | "success" | "error";
+
 export default function Home() {
+  const router = useRouter();
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
   const [apiHealth, setApiHealth] = useState<"loading" | "online" | "offline">("loading");
   const [dragActive, setDragActive] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "materials" | "calendar">("dashboard");
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Upload states
+  const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const [uploadResult, setUploadResult] = useState<{
+    id: string;
+    filename: string;
+    chunks_indexed: number;
+    chars_extracted: number;
+  } | null>(null);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
 
   // Check API health on load
   const checkHealth = async () => {
@@ -48,6 +67,66 @@ export default function Home() {
     return () => clearInterval(interval);
   }, []);
 
+  // ── Upload logic ────────────────────────────────────────────────────────────
+
+  const uploadFile = async (file: File) => {
+    if (!["application/pdf", "text/plain"].includes(file.type)) {
+      setUploadStatus("error");
+      setUploadError(`Tipo não suportado: ${file.type}. Use PDF ou TXT.`);
+      return;
+    }
+
+    setSelectedFile(file);
+    setUploadStatus("uploading");
+    setUploadError(null);
+    setUploadResult(null);
+
+    const formData = new FormData();
+    formData.append("file", file);
+
+    try {
+      const res = await fetch("http://localhost:8000/materials/", {
+        method: "POST",
+        body: formData,
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ detail: "Erro desconhecido" }));
+        throw new Error(err.detail ?? `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setUploadResult(data);
+      setUploadStatus("success");
+    } catch (e: any) {
+      setUploadStatus("error");
+      setUploadError(e.message ?? "Falha ao enviar arquivo.");
+    }
+  };
+
+  const handleFileInput = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) uploadFile(file);
+    // reset input so the same file can be re-selected
+    e.target.value = "";
+  };
+
+  const handleDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    setDragActive(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) uploadFile(file);
+  };
+
+  const resetUpload = () => {
+    setUploadStatus("idle");
+    setUploadError(null);
+    setUploadResult(null);
+    setSelectedFile(null);
+  };
+
+  // ── Render ──────────────────────────────────────────────────────────────────
+
   return (
     <div className="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-slate-100 selection:bg-blue-600 selection:text-white">
       {/* Header */}
@@ -63,35 +142,41 @@ export default function Home() {
             </div>
           </div>
 
-          <nav className="hidden md:flex space-x-1">
-            <button 
-              onClick={() => setActiveTab("dashboard")} 
+          <nav className="hidden md:flex space-x-1 items-center">
+            <button
+              onClick={() => setActiveTab("dashboard")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === "dashboard" ? "bg-slate-800/60 text-blue-400 shadow-inner" : "text-slate-400 hover:text-slate-200"}`}
             >
               Dashboard
             </button>
-            <button 
-              onClick={() => setActiveTab("materials")} 
+            <button
+              onClick={() => setActiveTab("materials")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === "materials" ? "bg-slate-800/60 text-blue-400 shadow-inner" : "text-slate-400 hover:text-slate-200"}`}
             >
               Materials & Ingestion
             </button>
-            <button 
-              onClick={() => setActiveTab("calendar")} 
+            <button
+              onClick={() => setActiveTab("calendar")}
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 ${activeTab === "calendar" ? "bg-slate-800/60 text-blue-400 shadow-inner" : "text-slate-400 hover:text-slate-200"}`}
             >
               Study Planner
             </button>
+            <Link
+              href="/chat"
+              className="px-4 py-2 rounded-lg text-sm font-medium text-slate-400 hover:text-slate-200 transition-all duration-200 flex items-center gap-1.5"
+            >
+              <Sparkles className="h-4 w-4 text-blue-400 animate-pulse" />
+              <span>Mnemo Chat</span>
+            </Link>
           </nav>
 
           <div className="flex items-center space-x-3">
-            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border backdrop-blur-sm ${
-              apiHealth === "online" 
-                ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" 
-                : apiHealth === "offline" 
-                  ? "bg-rose-500/10 border-rose-500/30 text-rose-400" 
-                  : "bg-amber-500/10 border-amber-500/30 text-amber-400"
-            }`}>
+            <div className={`flex items-center space-x-2 px-3 py-1.5 rounded-full text-xs font-medium border backdrop-blur-sm ${apiHealth === "online"
+              ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400"
+              : apiHealth === "offline"
+                ? "bg-rose-500/10 border-rose-500/30 text-rose-400"
+                : "bg-amber-500/10 border-amber-500/30 text-amber-400"
+              }`}>
               <span className={`h-2 w-2 rounded-full ${apiHealth === "online" ? "bg-emerald-500 animate-ping" : apiHealth === "offline" ? "bg-rose-500" : "bg-amber-500 animate-pulse"}`} />
               <span className="font-mono uppercase tracking-wider text-[10px]">
                 API: {apiHealth === "online" ? "online" : apiHealth === "offline" ? "offline" : "checking"}
@@ -107,7 +192,7 @@ export default function Home() {
         <section className="relative overflow-hidden rounded-3xl border border-slate-800 bg-slate-900/30 backdrop-blur-sm p-8 sm:p-10 mb-8 shadow-2xl shadow-indigo-950/10">
           <div className="absolute top-0 right-0 -mt-12 -mr-12 h-64 w-64 rounded-full bg-blue-500/10 blur-[100px] pointer-events-none" />
           <div className="absolute bottom-0 left-0 -mb-12 -ml-12 h-64 w-64 rounded-full bg-indigo-500/10 blur-[100px] pointer-events-none" />
-          
+
           <div className="relative z-10 max-w-3xl">
             <div className="inline-flex items-center space-x-2 px-2.5 py-1 rounded-md bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-medium mb-4">
               <Cpu className="h-3.5 w-3.5" />
@@ -117,19 +202,26 @@ export default function Home() {
               Organize studies and augment memory using <span className="bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent">Local AI</span>
             </h1>
             <p className="text-slate-400 text-base sm:text-lg mb-6 leading-relaxed">
-              Mnemo is an adaptive learning system that tracks your focus metrics, 
+              Mnemo is an adaptive learning system that tracks your focus metrics,
               creates semantic vector mappings of your upload materials using Local RAG, and generates custom revision loops.
             </p>
             <div className="flex flex-wrap gap-3">
-              <button 
-                onClick={() => setActiveTab("materials")} 
+              <button
+                onClick={() => setActiveTab("materials")}
                 className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-semibold text-sm shadow-lg shadow-blue-500/20 hover:shadow-blue-500/30 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
               >
                 Injest Material
               </button>
-              <button 
-                onClick={() => setActiveTab("dashboard")} 
-                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-sm transition-all duration-200 hover:-translate-y-0.5 active:translate-y-0"
+              <Link
+                href="/chat"
+                className="px-5 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600/35 to-blue-600/35 hover:from-indigo-600/50 hover:to-blue-600/50 text-slate-100 border border-slate-800 font-semibold text-sm shadow-lg shadow-indigo-500/5 hover:shadow-indigo-500/10 transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0 flex items-center gap-2"
+              >
+                <Sparkles className="h-4 w-4 text-blue-400 animate-pulse" />
+                <span>Abrir Chat de IA</span>
+              </Link>
+              <button
+                onClick={() => setActiveTab("dashboard")}
+                className="px-5 py-2.5 rounded-xl bg-slate-800 hover:bg-slate-700 text-slate-200 border border-slate-700 font-semibold text-sm transition-all duration-200 transform hover:-translate-y-0.5 active:translate-y-0"
               >
                 View Analytics
               </button>
@@ -153,7 +245,7 @@ export default function Home() {
                     <TrendingUp className="h-3 w-3 mr-0.5" /> +15% vs semana anterior
                   </span>
                 </div>
-                
+
                 <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-5 hover:border-slate-700/80 transition-all duration-200">
                   <div className="flex justify-between items-start mb-3">
                     <span className="text-slate-400 text-xs font-medium uppercase tracking-wider">Consistência</span>
@@ -184,20 +276,48 @@ export default function Home() {
                   Busca Semântica & Chat Contextual
                 </h3>
                 <p className="text-xs text-slate-400 mb-4">Execute buscas baseadas em embeddings locais usando os materiais indexados.</p>
-                <div className="relative">
-                  <input 
-                    type="text" 
-                    placeholder="Ex: 'Explique redes convolucionais com base nos meus slides de IA'" 
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    if (searchQuery.trim()) {
+                      router.push(`/chat?q=${encodeURIComponent(searchQuery.trim())}`);
+                    }
+                  }}
+                  className="relative"
+                >
+                  <input
+                    type="text"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Ex: 'Explique redes convolucionais com base nos meus slides de IA'"
                     className="w-full bg-slate-950 border border-slate-800 focus:border-blue-500 focus:ring-1 focus:ring-blue-500 rounded-xl py-3 pl-4 pr-12 text-sm text-slate-200 outline-none transition-all duration-200 placeholder:text-slate-600"
                   />
-                  <button className="absolute right-2 top-2 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white transition-colors duration-200">
+                  <button
+                    type="submit"
+                    className="absolute right-2 top-2 h-8 w-8 rounded-lg bg-blue-600 hover:bg-blue-500 flex items-center justify-center text-white transition-colors duration-200"
+                  >
                     <Sparkles className="h-4 w-4" />
                   </button>
-                </div>
+                </form>
                 <div className="mt-3 flex flex-wrap gap-1.5">
-                  <span className="text-[10px] bg-slate-950 px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 cursor-pointer border border-slate-800/50">#redes-neurais</span>
-                  <span className="text-[10px] bg-slate-950 px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 cursor-pointer border border-slate-800/50">#estatistica</span>
-                  <span className="text-[10px] bg-slate-950 px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 cursor-pointer border border-slate-800/50">#historia-romana</span>
+                  <span
+                    onClick={() => setSearchQuery("Explique redes neurais artificiais")}
+                    className="text-[10px] bg-slate-950 px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 cursor-pointer border border-slate-800/50"
+                  >
+                    #redes-neurais
+                  </span>
+                  <span
+                    onClick={() => setSearchQuery("Resuma conceitos de estatística descritiva")}
+                    className="text-[10px] bg-slate-950 px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 cursor-pointer border border-slate-800/50"
+                  >
+                    #estatistica
+                  </span>
+                  <span
+                    onClick={() => setSearchQuery("Qual foi o período da história romana clássica?")}
+                    className="text-[10px] bg-slate-950 px-2.5 py-1 rounded text-slate-400 hover:text-slate-200 cursor-pointer border border-slate-800/50"
+                  >
+                    #historia-romana
+                  </span>
                 </div>
               </div>
             </div>
@@ -210,7 +330,7 @@ export default function Home() {
                   IA Adaptativa — Insights
                 </h3>
                 <p className="text-xs text-slate-400 mb-4">Métricas cognitivas geradas automaticamente por análise de hábitos.</p>
-                
+
                 <div className="space-y-4">
                   <div className="flex items-start space-x-3 p-3 bg-slate-950/50 rounded-xl border border-slate-800/40">
                     <div className="mt-0.5 rounded-full p-1 bg-amber-500/10 text-amber-400">
@@ -256,26 +376,110 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 animate-fadeIn">
             {/* Upload Zone */}
             <div className="lg:col-span-2 space-y-6">
-              <div 
-                onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
-                onDragLeave={() => setDragActive(false)}
-                onDrop={(e) => { e.preventDefault(); setDragActive(false); }}
-                className={`bg-slate-900/25 border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all duration-200 ${dragActive ? "border-blue-500 bg-blue-500/5" : "border-slate-800 hover:border-slate-700/80"}`}
-              >
-                <div className="h-12 w-12 rounded-xl bg-slate-900 border border-slate-800 flex items-center justify-center text-slate-400 mb-4 shadow-lg">
-                  <Upload className="h-6 w-6" />
-                </div>
-                <h4 className="text-sm font-bold text-white mb-1">Arrastar e soltar arquivo</h4>
-                <p className="text-xs text-slate-500 mb-6">Suporta PDF e TXT para extração de texto (Max 10MB)</p>
-                
-                <input type="file" id="file-upload" className="hidden" />
-                <label 
-                  htmlFor="file-upload" 
-                  className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors duration-150 cursor-pointer shadow-md shadow-blue-500/10"
+
+              {/* ── idle / uploading state ── */}
+              {uploadStatus !== "success" && (
+                <div
+                  onDragOver={(e) => { e.preventDefault(); setDragActive(true); }}
+                  onDragLeave={() => setDragActive(false)}
+                  onDrop={handleDrop}
+                  className={`bg-slate-900/25 border-2 border-dashed rounded-2xl p-10 flex flex-col items-center justify-center transition-all duration-200 ${dragActive
+                      ? "border-blue-500 bg-blue-500/5"
+                      : uploadStatus === "error"
+                        ? "border-rose-500/60 bg-rose-500/5"
+                        : "border-slate-800 hover:border-slate-700/80"
+                    }`}
                 >
-                  Selecionar Arquivo
-                </label>
-              </div>
+                  <div className={`h-12 w-12 rounded-xl border flex items-center justify-center mb-4 shadow-lg transition-colors duration-200 ${uploadStatus === "error"
+                      ? "bg-rose-950 border-rose-800 text-rose-400"
+                      : uploadStatus === "uploading"
+                        ? "bg-blue-950 border-blue-800 text-blue-400"
+                        : "bg-slate-900 border-slate-800 text-slate-400"
+                    }`}>
+                    {uploadStatus === "uploading"
+                      ? <svg className="animate-spin h-6 w-6" fill="none" viewBox="0 0 24 24"><circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" /><path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" /></svg>
+                      : uploadStatus === "error"
+                        ? <XCircle className="h-6 w-6" />
+                        : <Upload className="h-6 w-6" />
+                    }
+                  </div>
+
+                  {uploadStatus === "uploading" ? (
+                    <>
+                      <h4 className="text-sm font-bold text-white mb-1">Enviando arquivo...</h4>
+                      <p className="text-xs text-slate-500">{selectedFile?.name}</p>
+                    </>
+                  ) : uploadStatus === "error" ? (
+                    <>
+                      <h4 className="text-sm font-bold text-rose-400 mb-1">Falha no envio</h4>
+                      <p className="text-xs text-slate-500 mb-4 text-center max-w-xs">{uploadError}</p>
+                      <button
+                        onClick={resetUpload}
+                        className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors duration-150"
+                      >
+                        Tentar novamente
+                      </button>
+                    </>
+                  ) : (
+                    <>
+                      <h4 className="text-sm font-bold text-white mb-1">Arrastar e soltar arquivo</h4>
+                      <p className="text-xs text-slate-500 mb-6">Suporta PDF e TXT para extração de texto (Max 10MB)</p>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        id="file-upload"
+                        className="hidden"
+                        accept=".pdf,.txt,application/pdf,text/plain"
+                        onChange={handleFileInput}
+                      />
+                      <label
+                        htmlFor="file-upload"
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors duration-150 cursor-pointer shadow-md shadow-blue-500/10"
+                      >
+                        Selecionar Arquivo
+                      </label>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ── success state ── */}
+              {uploadStatus === "success" && uploadResult && (
+                <div className="bg-emerald-500/5 border border-emerald-500/30 rounded-2xl p-8 flex flex-col items-center text-center">
+                  <div className="h-12 w-12 rounded-xl bg-emerald-950 border border-emerald-800 flex items-center justify-center text-emerald-400 mb-4 shadow-lg">
+                    <CheckCircle2 className="h-6 w-6" />
+                  </div>
+                  <h4 className="text-sm font-bold text-white mb-1">Arquivo indexado com sucesso</h4>
+                  <p className="text-xs text-slate-400 mb-5">{uploadResult.filename}</p>
+
+                  <div className="grid grid-cols-2 gap-3 w-full max-w-xs mb-6">
+                    <div className="bg-slate-950/60 rounded-xl border border-slate-800/40 p-3">
+                      <span className="text-[10px] text-slate-500 font-mono block mb-1">CHUNKS</span>
+                      <span className="text-lg font-bold text-white">{uploadResult.chunks_indexed}</span>
+                    </div>
+                    <div className="bg-slate-950/60 rounded-xl border border-slate-800/40 p-3">
+                      <span className="text-[10px] text-slate-500 font-mono block mb-1">CARACTERES</span>
+                      <span className="text-lg font-bold text-white">{uploadResult.chars_extracted.toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={resetUpload}
+                      className="px-4 py-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs transition-colors duration-150"
+                    >
+                      Enviar outro arquivo
+                    </button>
+                    <Link
+                      href="/chat"
+                      className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 text-white font-semibold text-xs transition-colors duration-150 flex items-center gap-1.5"
+                    >
+                      <Sparkles className="h-3.5 w-3.5" />
+                      Ir para o Chat
+                    </Link>
+                  </div>
+                </div>
+              )}
 
               {/* API upload instructions */}
               <div className="bg-slate-950 border border-slate-900 rounded-2xl p-5">
