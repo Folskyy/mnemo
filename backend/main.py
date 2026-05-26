@@ -2,9 +2,11 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
+import models  # Ensures all tables (including StudySession) are registered in SQLModel
 from database import create_tables
 from api.routes.materials import router as materials_router
 from api.routes.chat import router as chat_router
+from api.routes.sessions import router as sessions_router
 
 
 @asynccontextmanager
@@ -26,6 +28,7 @@ app.add_middleware(
 
 app.include_router(materials_router)
 app.include_router(chat_router)
+app.include_router(sessions_router)
 
 
 @app.get("/health")
