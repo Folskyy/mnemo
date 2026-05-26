@@ -17,12 +17,12 @@ from models.material import Material
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
-UPLOAD_DIR = os.getenv("UPLOAD_DIR", "/app/data/documents")
+CHROMA_UPLOAD_DIR = os.getenv("CHROMA_UPLOAD_DIR", "/app/data/documents")
 CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "localhost")
-OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11435")
-EMBED_MODEL = "nomic-embed-text"
+OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
+EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 80
 
@@ -58,6 +58,8 @@ def get_chroma_collection(name: str = "mnemo"):
     return client.get_or_create_collection(name)
 
 
+# ── gambiarras ────────────────────────────────────────────────────────────────
+
 # ── endpoint ──────────────────────────────────────────────────────────────────
 
 @router.post("/", status_code=201)
@@ -70,10 +72,10 @@ async def upload_material(
         raise HTTPException(400, f"Tipo não suportado: {file.content_type}")
 
     # 1. Salvar em disco
-    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    os.makedirs(CHROMA_UPLOAD_DIR, exist_ok=True)
     file_id = str(uuid.uuid4())
     ext = ".pdf" if file.content_type == "application/pdf" else ".txt"
-    file_path = os.path.join(UPLOAD_DIR, f"{file_id}{ext}")
+    file_path = os.path.join(CHROMA_UPLOAD_DIR, f"{file_id}{ext}")
 
     content = await file.read()
     with open(file_path, "wb") as f:
@@ -108,7 +110,7 @@ async def upload_material(
             "total_chunks": len(chunks),
             "created_at": now,
         })
-
+    
     collection.add(ids=chunk_ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
 
     # 5. Salvar metadata no Postgres
