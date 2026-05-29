@@ -588,7 +588,7 @@ export default function Home() {
           </div>
           <div className="flex space-x-4 mt-2 sm:mt-0">
             <span className="hover:text-slate-400 cursor-pointer">FastAPI + PostgreSQL</span>
-            <span className="hover:text-slate-400 cursor-pointer">ChromaDB + Ollama</span>
+            <span className="hover:text-slate-400 cursor-pointer">ChromaDB + Ollama + Groq</span>
             <span className="hover:text-slate-400 cursor-pointer">Next.js</span>
           </div>
         </div>

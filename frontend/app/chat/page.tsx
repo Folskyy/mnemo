@@ -345,7 +345,7 @@ export default function ChatPage() {
           </div>
           <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono px-2">
             <span>RAG local ativo: nomic-embed-text</span>
-            <span>Modelo: llama3</span>
+            <span>Modelo: Groq (llama3-8b-8192)</span>
           </div>
         </form>
       </main>
