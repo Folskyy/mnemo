@@ -12,13 +12,15 @@ router = APIRouter(prefix="/chat", tags=["chat"])
 # Retrieve environment variables
 OLLAMA_HOST = os.getenv("OLLAMA_HOST", "ollama")
 OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
-CHROMA_HOST = os.getenv("CHROMA_HOST", "0.0.0.0")
+CHROMA_HOST = os.getenv("CHROMA_HOST", "chromadb")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHAT_MODEL = os.getenv("CHAT_MODEL")
+GROQ_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_PROXY_API_KEY", "")
+GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
 
 if not CHAT_MODEL:
-    raise RuntimeError("CHAT_MODEL environment variable is not defined.\nDIr: ", os.getcwd())
+    raise RuntimeError("CHAT_MODEL environment variable is not defined.")
 
 class MessageModel(BaseModel):
     role: str  # "user" | "assistant"
@@ -45,8 +47,15 @@ def get_chroma_collection(name: str = "mnemo"):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to connect to ChromaDB: {e}")
 
-async def stream_ollama(prompt: str):
-    url = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/chat"
+async def stream_groq(prompt: str):
+    if not GROQ_API_KEY:
+        yield "Error: GROQ_API_KEY environment variable is not set."
+        return
+
+    headers = {
+        "Authorization": f"Bearer {GROQ_API_KEY}",
+        "Content-Type": "application/json"
+    }
     payload = {
         "model": CHAT_MODEL,
         "messages": [
@@ -60,28 +69,35 @@ async def stream_ollama(prompt: str):
     
     async with httpx.AsyncClient(timeout=None) as client:
         try:
-            async with client.stream("POST", url, json=payload) as response:
+            async with client.stream("POST", GROQ_API_URL, headers=headers, json=payload) as response:
                 if response.status_code != 200:
                     err_content = await response.aread()
-                    yield f"Error from Ollama ({response.status_code}): {err_content.decode()}"
+                    yield f"Error from Groq API ({response.status_code}): {err_content.decode()}"
                     return
                 
                 async for line in response.aiter_lines():
+                    line = line.strip()
                     if not line:
                         continue
-                    try:
-                        data = json.loads(line)
-                        # Extract the token/content from the message
-                        content = data.get("message", {}).get("content", "")
-                        if content:
-                            print(content, end="", flush=True)
-                            yield content
-                    except json.JSONDecodeError:
-                        continue
+                    if line.startswith("data:"):
+                        data_part = line[5:].strip()
+                        if data_part == "[DONE]":
+                            break
+                        try:
+                            data = json.loads(data_part)
+                            choices = data.get("choices", [])
+                            if choices:
+                                delta = choices[0].get("delta", {})
+                                content = delta.get("content", "")
+                                if content:
+                                    print(content, end="", flush=True)
+                                    yield content
+                        except json.JSONDecodeError:
+                            continue
             print() # Print a newline at the end of the stream
         except Exception as e:
-            print(f"\nError streaming from Ollama: {e}")
-            yield f"Error streaming from Ollama: {e}"
+            print(f"\nError streaming from Groq API: {e}")
+            yield f"Error streaming from Groq API: {e}"
 
 @router.post("")
 async def chat_endpoint(payload: ChatPayload):
@@ -115,12 +131,12 @@ Conversation history:
 
 Question: {payload.message}"""
 
-    print("--- PROMPT SENT TO OLLAMA ---")
-    print(prompt)
-    print("-----------------------------")
+    # print("--- PROMPT SENT TO GROQ PROXY ---")
+    # print(prompt)
+    # print("-----------------------------")
 
     return StreamingResponse(
-        stream_ollama(prompt),
+        stream_groq(prompt),
         media_type="text/event-stream",
         headers={"X-Content-Type-Options": "nosniff"}
     )
