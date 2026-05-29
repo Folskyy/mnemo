@@ -18,9 +18,9 @@ from schemas.material import Material
 router = APIRouter(prefix="/materials", tags=["materials"])
 
 CHROMA_UPLOAD_DIR = os.getenv("CHROMA_UPLOAD_DIR", "/app/data/documents")
-CHROMA_HOST = os.getenv("CHROMA_HOST", "localhost")
+CHROMA_HOST = os.getenv("CHROMA_HOST", "chromadb")
 CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "localhost")
+OLLAMA_HOST = os.getenv("OLLAMA_HOST", "ollama")
 OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
 EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHUNK_SIZE = 800
@@ -56,9 +56,6 @@ async def get_embedding(text: str) -> list[float]:
 def get_chroma_collection(name: str = "mnemo"):
     client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
     return client.get_or_create_collection(name)
-
-
-# ── gambiarras ────────────────────────────────────────────────────────────────
 
 # ── endpoint ──────────────────────────────────────────────────────────────────
 
