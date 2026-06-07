@@ -75,7 +75,7 @@ export function usePomodoroTimer() {
               const studyInc = parsed.mode === "focus" ? remaining : 0;
               const pauseInc = parsed.mode === "pause" ? remaining : 0;
 
-              const nextMode = parsed.mode === "focus" ? "pause" : "focus";
+              const nextMode: TimerMode = parsed.mode === "focus" ? "pause" : "focus";
               const nextDuration = nextMode === "focus" ? FOCUS_DURATION : PAUSE_DURATION;
 
               const expiredState = {
@@ -122,7 +122,7 @@ export function usePomodoroTimer() {
           const studyInc = prev.mode === "focus" ? remaining : 0;
           const pauseInc = prev.mode === "pause" ? remaining : 0;
 
-          const nextMode = prev.mode === "focus" ? "pause" : "focus";
+          const nextMode: TimerMode = prev.mode === "focus" ? "pause" : "focus";
           const nextDuration = nextMode === "focus" ? FOCUS_DURATION : PAUSE_DURATION;
 
           // Sound effect
@@ -201,7 +201,7 @@ export function usePomodoroTimer() {
           const studyInc = prev.mode === "focus" ? remaining : 0;
           const pauseInc = prev.mode === "pause" ? remaining : 0;
 
-          const nextMode = prev.mode === "focus" ? "pause" : "focus";
+          const nextMode: TimerMode = prev.mode === "focus" ? "pause" : "focus";
           const nextDuration = nextMode === "focus" ? FOCUS_DURATION : PAUSE_DURATION;
 
           const expiredState = {
