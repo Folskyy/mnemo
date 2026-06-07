@@ -21,6 +21,20 @@ import {
   Upload,
   XCircle
 } from "lucide-react";
+import CalendarView from "@/components/CalendarView";
+import {
+  ResponsiveContainer,
+  PieChart,
+  Pie,
+  Cell,
+  BarChart as RechartsBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  Tooltip,
+  AreaChart,
+  Area
+} from "recharts";
 
 type UploadStatus = "idle" | "uploading" | "success" | "error";
 
@@ -32,6 +46,17 @@ export default function Home() {
   const [dragActive, setDragActive] = useState(false);
   const [activeTab, setActiveTab] = useState<"dashboard" | "materials" | "calendar">("dashboard");
   const [searchQuery, setSearchQuery] = useState("");
+
+  interface InsightsData {
+    hours_per_day: Array<{ dow: number; name: string; total_minutes: number }>;
+    category_donut: Array<{ category_id: number | null; name: string; color: string; total_minutes: number }>;
+    consistency_heatmap: Array<{ date: string; count: number; minutes: number; active: boolean }>;
+    productivity_by_hour: Array<{ range: string; avg_productivity: number; session_count: number }>;
+  }
+
+  const [insights, setInsights] = useState<InsightsData | null>(null);
+  const [insightsLoading, setInsightsLoading] = useState(true);
+  const [insightsTab, setInsightsTab] = useState<"heatmap" | "donut" | "weekly" | "productivity">("heatmap");
 
   // Upload states
   const [uploadStatus, setUploadStatus] = useState<UploadStatus>("idle");
@@ -66,6 +91,27 @@ export default function Home() {
     const interval = setInterval(checkHealth, 5000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    if (activeTab === "dashboard" && apiHealth === "online") {
+      const fetchInsights = async () => {
+        try {
+          setInsightsLoading(true);
+          const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+          const res = await fetch(`${apiBaseUrl}/sessions/insights`);
+          if (res.ok) {
+            const data = await res.json();
+            setInsights(data);
+          }
+        } catch (err) {
+          console.error("Error fetching insights:", err);
+        } finally {
+          setInsightsLoading(false);
+        }
+      };
+      fetchInsights();
+    }
+  }, [activeTab, apiHealth]);
 
   // ── Upload logic ────────────────────────────────────────────────────────────
 
@@ -123,6 +169,192 @@ export default function Home() {
     setUploadError(null);
     setUploadResult(null);
     setSelectedFile(null);
+  };
+
+  // ── Render Helpers for Insights ─────────────────────────────────────────────
+  
+  const renderHeatmap = () => {
+    if (!insights || !insights.consistency_heatmap) return null;
+    const days = insights.consistency_heatmap;
+    
+    const getColor = (minutes: number) => {
+      if (minutes === 0) return "bg-slate-950 border-slate-900/40 text-slate-800";
+      if (minutes < 30) return "bg-emerald-500/20 border-emerald-500/30 text-emerald-400";
+      if (minutes < 60) return "bg-emerald-500/40 border-emerald-500/50 text-emerald-300";
+      if (minutes < 120) return "bg-emerald-500/70 border-emerald-500/80 text-emerald-200";
+      return "bg-emerald-500 border-emerald-400 text-white shadow-sm shadow-emerald-500/30";
+    };
+
+    return (
+      <div className="space-y-4 animate-fadeIn">
+        <div className="grid grid-cols-7 gap-1.5 p-3 bg-slate-950/40 rounded-2xl border border-slate-950">
+          {days.map((day) => {
+            const dateObj = new Date(day.date);
+            const parts = day.date.split("-");
+            const dayNum = parts[2] ? parseInt(parts[2], 10) : dateObj.getDate();
+            const monthNum = parts[1] ? parseInt(parts[1], 10) : dateObj.getMonth() + 1;
+            const dateStr = `${dayNum.toString().padStart(2, '0')}/${monthNum.toString().padStart(2, '0')}`;
+            
+            return (
+              <div
+                key={day.date}
+                className={`aspect-square rounded-[4px] border flex flex-col items-center justify-center text-[8px] font-mono transition-all duration-200 cursor-help group relative ${getColor(day.minutes)}`}
+              >
+                {/* Tooltip */}
+                <span className="pointer-events-none absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-150 bg-slate-950 text-[10px] text-slate-200 font-sans border border-slate-800 px-2 py-1 rounded shadow-xl whitespace-nowrap z-50">
+                  {dateStr}: {day.minutes} min ({day.count} sess{day.count === 1 ? 'ão' : 'ões'})
+                </span>
+                <span>{dayNum}</span>
+              </div>
+            );
+          })}
+        </div>
+        
+        {/* Legend */}
+        <div className="flex items-center justify-between text-[10px] text-slate-500 font-mono">
+          <span>Menos foco</span>
+          <div className="flex items-center gap-1">
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-slate-950 border border-slate-900/60" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-emerald-500/20 border border-emerald-500/30" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-emerald-500/40 border border-emerald-500/50" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-emerald-500/70 border border-emerald-500/80" />
+            <div className="w-2.5 h-2.5 rounded-[2px] bg-emerald-500 border border-emerald-400" />
+          </div>
+          <span>Mais foco</span>
+        </div>
+      </div>
+    );
+  };
+
+  const renderCategoryDonut = () => {
+    if (!insights || !insights.category_donut || insights.category_donut.length === 0) {
+      return (
+        <div className="h-44 flex flex-col items-center justify-center text-xs text-slate-500 font-mono border border-dashed border-slate-800/80 rounded-2xl p-4 bg-slate-950/20">
+          <span>Nenhum dado por categoria.</span>
+          <span className="text-[10px] text-slate-600 mt-1">Realize sessões no Pomodoro.</span>
+        </div>
+      );
+    }
+    const data = insights.category_donut;
+    return (
+      <div className="space-y-4 animate-fadeIn">
+        <div className="h-44 w-full flex items-center justify-center">
+          <ResponsiveContainer width="100%" height="100%">
+            <PieChart>
+              <Pie
+                data={data}
+                cx="50%"
+                cy="50%"
+                innerRadius={50}
+                outerRadius={70}
+                paddingAngle={4}
+                dataKey="total_minutes"
+              >
+                {data.map((entry, index) => (
+                  <Cell key={`cell-${index}`} fill={entry.color} />
+                ))}
+              </Pie>
+              <Tooltip
+                contentStyle={{ background: "#020617", border: "1px solid #1e293b", borderRadius: "12px", fontSize: "11px", fontFamily: "monospace" }}
+                formatter={(value: any) => [`${value} min`, "Tempo"]}
+              />
+            </PieChart>
+          </ResponsiveContainer>
+        </div>
+        
+        {/* Legend list */}
+        <div className="grid grid-cols-2 gap-2 max-h-24 overflow-y-auto pr-1 text-[10px] font-mono scrollbar-none">
+          {data.map((cat, index) => (
+            <div key={index} className="flex items-center space-x-2 bg-slate-950/40 p-1.5 rounded-lg border border-slate-900/50">
+              <span className="h-2 w-2 rounded-full flex-shrink-0" style={{ backgroundColor: cat.color }} />
+              <span className="truncate text-slate-300 max-w-[80px]" title={cat.name}>{cat.name}</span>
+              <span className="text-slate-500 font-bold ml-auto">{cat.total_minutes}m</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderWeeklyHours = () => {
+    if (!insights || !insights.hours_per_day) return null;
+    const data = insights.hours_per_day.map(d => ({
+      name: d.name.substring(0, 3),
+      horas: Number((d.total_minutes / 60).toFixed(1)),
+      minutos: d.total_minutes
+    }));
+
+    return (
+      <div className="space-y-4 animate-fadeIn">
+        <div className="h-44 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <RechartsBarChart data={data} margin={{ top: 10, right: 5, left: -25, bottom: 5 }}>
+              <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip
+                contentStyle={{ background: "#020617", border: "1px solid #1e293b", borderRadius: "12px", fontSize: "11px", fontFamily: "monospace" }}
+                formatter={(value: any, name: any, props: any) => [`${props.payload.minutos} min (${value}h)`, "Estudado"]}
+              />
+              <Bar dataKey="horas" fill="url(#barGradient)" radius={[4, 4, 0, 0]} />
+              <defs>
+                <linearGradient id="barGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#3b82f6" stopOpacity={0.8}/>
+                  <stop offset="100%" stopColor="#1d4ed8" stopOpacity={0.2}/>
+                </linearGradient>
+              </defs>
+            </RechartsBarChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="text-[10px] text-slate-500 font-mono text-center bg-slate-950/40 py-1.5 rounded-lg border border-slate-900/50">
+          Soma semanal: {insights.hours_per_day.reduce((acc, d) => acc + d.total_minutes, 0)} minutos
+        </div>
+      </div>
+    );
+  };
+
+  const renderHourlyProductivity = () => {
+    if (!insights || !insights.productivity_by_hour) return null;
+    const data = insights.productivity_by_hour.map(item => {
+      const shortRange = item.range.split(" ")[0];
+      return {
+        name: shortRange,
+        faixa: item.range,
+        produtividade: item.avg_productivity,
+        sessoes: item.session_count
+      };
+    });
+
+    return (
+      <div className="space-y-4 animate-fadeIn">
+        <div className="h-44 w-full">
+          <ResponsiveContainer width="100%" height="100%">
+            <AreaChart data={data} margin={{ top: 10, right: 5, left: -25, bottom: 5 }}>
+              <XAxis dataKey="name" stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+              <YAxis domain={[0, 5]} stroke="#64748b" fontSize={10} tickLine={false} axisLine={false} />
+              <Tooltip
+                contentStyle={{ background: "#020617", border: "1px solid #1e293b", borderRadius: "12px", fontSize: "11px", fontFamily: "monospace" }}
+                formatter={(value: any) => [`${value} / 5.0`, "Foco Médio"]}
+              />
+              <Area type="monotone" dataKey="produtividade" stroke="#818cf8" fillOpacity={1} fill="url(#areaGradient)" />
+              <defs>
+                <linearGradient id="areaGradient" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="0%" stopColor="#818cf8" stopOpacity={0.4}/>
+                  <stop offset="100%" stopColor="#818cf8" stopOpacity={0}/>
+                </linearGradient>
+              </defs>
+            </AreaChart>
+          </ResponsiveContainer>
+        </div>
+        <div className="grid grid-cols-2 gap-2 text-[10px] font-mono bg-slate-950/40 p-2.5 rounded-xl border border-slate-900/50">
+          {data.map((item, idx) => (
+            <div key={idx} className="flex justify-between items-center text-slate-400">
+              <span>{item.name}:</span>
+              <span className="font-bold text-slate-200">{item.produtividade > 0 ? `${item.produtividade}★` : "Sem dados"}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
   };
 
   // ── Render ──────────────────────────────────────────────────────────────────
@@ -330,7 +562,7 @@ export default function Home() {
             </div>
 
             {/* Cognitive Insights Panel */}
-            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 flex flex-col justify-between">
+            <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 flex flex-col justify-between min-h-[350px]">
               <div>
                 <h3 className="text-base font-bold text-white mb-1 flex items-center">
                   <Cpu className="h-4 w-4 mr-2 text-indigo-400" />
@@ -338,37 +570,52 @@ export default function Home() {
                 </h3>
                 <p className="text-xs text-slate-400 mb-4">Métricas cognitivas geradas automaticamente por análise de hábitos.</p>
 
-                <div className="space-y-4">
-                  <div className="flex items-start space-x-3 p-3 bg-slate-950/50 rounded-xl border border-slate-800/40">
-                    <div className="mt-0.5 rounded-full p-1 bg-amber-500/10 text-amber-400">
-                      <Info className="h-3.5 w-3.5" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-200">Queda de Foco às 22h</p>
-                      <p className="text-[10px] text-slate-500">Seu tempo de foco diminui 40% após as 22h. Recomendamos sessões curtas à noite.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3 p-3 bg-slate-950/50 rounded-xl border border-slate-800/40">
-                    <div className="mt-0.5 rounded-full p-1 bg-blue-500/10 text-blue-400">
-                      <TrendingUp className="h-3.5 w-3.5" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-200">Alta Retenção em Matemática</p>
-                      <p className="text-[10px] text-slate-500">Sua retenção de exatas é 20% maior em sessões matinais de 40 minutos.</p>
-                    </div>
-                  </div>
-
-                  <div className="flex items-start space-x-3 p-3 bg-slate-950/50 rounded-xl border border-slate-800/40">
-                    <div className="mt-0.5 rounded-full p-1 bg-emerald-500/10 text-emerald-400">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                    </div>
-                    <div>
-                      <p className="text-xs font-semibold text-slate-200">Revisão Espaçada Ativa</p>
-                      <p className="text-[10px] text-slate-500">3 flashcards de IA pendentes para fixação da matéria de ontem.</p>
-                    </div>
-                  </div>
+                {/* Sub-tabs */}
+                <div className="flex border-b border-slate-800/80 mb-4 overflow-x-auto whitespace-nowrap scrollbar-none gap-4">
+                  <button
+                    onClick={() => setInsightsTab("heatmap")}
+                    className={`pb-2 text-xs font-semibold border-b-2 transition-all duration-205 ${insightsTab === "heatmap" ? "border-indigo-500 text-indigo-400 font-bold" : "border-transparent text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Consistência
+                  </button>
+                  <button
+                    onClick={() => setInsightsTab("donut")}
+                    className={`pb-2 text-xs font-semibold border-b-2 transition-all duration-205 ${insightsTab === "donut" ? "border-indigo-500 text-indigo-400 font-bold" : "border-transparent text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Categorias
+                  </button>
+                  <button
+                    onClick={() => setInsightsTab("weekly")}
+                    className={`pb-2 text-xs font-semibold border-b-2 transition-all duration-205 ${insightsTab === "weekly" ? "border-indigo-500 text-indigo-400 font-bold" : "border-transparent text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Semana
+                  </button>
+                  <button
+                    onClick={() => setInsightsTab("productivity")}
+                    className={`pb-2 text-xs font-semibold border-b-2 transition-all duration-205 ${insightsTab === "productivity" ? "border-indigo-500 text-indigo-400 font-bold" : "border-transparent text-slate-500 hover:text-slate-300"}`}
+                  >
+                    Horário
+                  </button>
                 </div>
+
+                {/* Tab content */}
+                {insightsLoading ? (
+                  <div className="space-y-4 py-8 animate-pulse">
+                    <div className="h-28 bg-slate-950/50 rounded-xl border border-slate-800/40" />
+                    <div className="h-4 bg-slate-950/50 rounded w-2/3 mx-auto" />
+                  </div>
+                ) : insights ? (
+                  <>
+                    {insightsTab === "heatmap" && renderHeatmap()}
+                    {insightsTab === "donut" && renderCategoryDonut()}
+                    {insightsTab === "weekly" && renderWeeklyHours()}
+                    {insightsTab === "productivity" && renderHourlyProductivity()}
+                  </>
+                ) : (
+                  <div className="text-center py-12 text-xs text-rose-400 font-mono border border-dashed border-rose-500/20 bg-rose-500/5 rounded-2xl">
+                    Falha ao carregar métricas da API.
+                  </div>
+                )}
               </div>
 
               <div className="pt-4 border-t border-slate-800/60 mt-4 flex items-center justify-between text-xs text-slate-500 font-mono">
@@ -543,40 +790,7 @@ export default function Home() {
         )}
 
         {activeTab === "calendar" && (
-          <div className="bg-slate-900/40 border border-slate-800/80 rounded-2xl p-6 animate-fadeIn">
-            <div className="max-w-2xl">
-              <h3 className="text-base font-bold text-white mb-1 flex items-center">
-                <CalendarIcon className="h-4 w-4 mr-2 text-blue-400" />
-                Cronograma Inteligente
-              </h3>
-              <p className="text-xs text-slate-400 mb-6">Integra metas, datas de entrega e sua disponibilidade diária.</p>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-6">
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Meta Semanal (Horas)</label>
-                  <input type="number" defaultValue="15" className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2 text-sm outline-none focus:border-blue-500 text-slate-200" />
-                </div>
-                <div>
-                  <label className="block text-xs font-medium text-slate-400 mb-1.5">Frequência Pomodoro</label>
-                  <select className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3.5 py-2.5 text-sm outline-none focus:border-blue-500 text-slate-200">
-                    <option>25 min foco / 5 min pausa</option>
-                    <option>50 min foco / 10 min pausa</option>
-                    <option>Sem restrições (cronômetro corrido)</option>
-                  </select>
-                </div>
-              </div>
-
-              <div className="bg-blue-600/10 border border-blue-500/20 rounded-xl p-4 flex items-start space-x-3">
-                <Sparkles className="h-5 w-5 text-blue-400 mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs font-semibold text-slate-200">Sugestão de Rotina Linear</p>
-                  <p className="text-[11px] text-slate-400 leading-relaxed mt-0.5">
-                    Com base no seu histórico e nos 8 arquivos indexados, seu cronograma linear sugere focar em revisões de redes neurais no período da manhã (09:00 - 10:20), mantendo blocos curtos à noite para evitar estafa.
-                  </p>
-                </div>
-              </div>
-            </div>
-          </div>
+          <CalendarView />
         )}
       </main>
 
