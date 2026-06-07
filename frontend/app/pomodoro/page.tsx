@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { 
   ArrowLeft, 
@@ -34,6 +34,24 @@ export default function PomodoroPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [saveStatus, setSaveStatus] = useState<"idle" | "success" | "error">("idle");
   const [errorMessage, setErrorMessage] = useState("");
+  const [categories, setCategories] = useState<any[]>([]);
+  const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null);
+
+  useEffect(() => {
+    const fetchCategories = async () => {
+      try {
+        const apiBaseUrl = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+        const response = await fetch(`${apiBaseUrl}/categories/`);
+        if (response.ok) {
+          const data = await response.json();
+          setCategories(data);
+        }
+      } catch (error) {
+        console.error("Error fetching categories:", error);
+      }
+    };
+    fetchCategories();
+  }, []);
 
   const {
     mode,
@@ -105,6 +123,7 @@ export default function PomodoroPage() {
           study_time: accumulatedStudyTime,
           pause_time: accumulatedPauseTime,
           productivity_level: productivityLevel,
+          category_id: selectedCategoryId,
         }),
       });
 
@@ -142,6 +161,9 @@ export default function PomodoroPage() {
   // Calculate progress percentage
   const totalDuration = mode === "focus" ? 25 * 60 : 5 * 60;
   const progressPercent = ((totalDuration - remainingSeconds) / totalDuration) * 100;
+
+  const selectedCategory = categories.find(c => c.id === selectedCategoryId);
+  const themeColor = selectedCategory?.color || (mode === "focus" ? "#ea580c" : "#2563eb");
 
   return (
     <div className="min-h-screen flex flex-col bg-[radial-gradient(ellipse_at_top,_var(--tw-gradient-stops))] from-slate-900 via-slate-950 to-black text-slate-100 selection:bg-blue-600 selection:text-white">
@@ -184,12 +206,16 @@ export default function PomodoroPage() {
       <main className="flex-grow flex flex-col items-center justify-center max-w-lg w-full mx-auto px-4 py-8 relative">
         
         {/* Decorative background glow */}
-        <div className={`absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-[120px] pointer-events-none opacity-20 transition-all duration-700 ${
-          mode === "focus" ? "bg-orange-500" : "bg-blue-500"
-        }`} />
+        <div 
+          className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-80 h-80 rounded-full blur-[120px] pointer-events-none opacity-20 transition-all duration-700" 
+          style={{ backgroundColor: themeColor }}
+        />
 
         {/* Timer Container Card */}
-        <div className="w-full bg-slate-900/35 border border-slate-800/80 rounded-3xl backdrop-blur-md p-8 shadow-2xl flex flex-col items-center relative z-10">
+        <div 
+          className="w-full bg-slate-900/35 border border-slate-800/80 rounded-3xl backdrop-blur-md p-8 shadow-2xl flex flex-col items-center relative z-10 transition-colors duration-300"
+          style={{ borderColor: selectedCategory ? themeColor + "30" : undefined }}
+        >
           
           {/* Mode Badge */}
           <div className={`inline-flex items-center space-x-1.5 px-3 py-1 rounded-full border text-xs font-semibold uppercase tracking-wider mb-6 ${
@@ -210,6 +236,29 @@ export default function PomodoroPage() {
             )}
           </div>
 
+          {/* Category Selector */}
+          <div className="w-full mb-6 max-w-xs">
+            <label className="block text-[10px] font-mono text-slate-500 uppercase tracking-widest mb-1.5 text-center">
+              Matéria / Categoria
+            </label>
+            <select
+              value={selectedCategoryId ?? ""}
+              onChange={(e) => {
+                const val = e.target.value;
+                setSelectedCategoryId(val ? Number(val) : null);
+              }}
+              className="w-full bg-slate-950/85 border border-slate-800/80 focus:border-indigo-500 rounded-xl px-3 py-2 text-xs text-slate-200 outline-none transition-all duration-200 cursor-pointer"
+              style={{ borderColor: selectedCategory ? themeColor + "60" : undefined }}
+            >
+              <option value="">Sem categoria (Geral)</option>
+              {categories.map((cat) => (
+                <option key={cat.id} value={cat.id}>
+                  {cat.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Large Clock Display */}
           <div className="relative w-64 h-64 flex items-center justify-center mb-8 select-none">
             {/* SVG Circular Progress Bar */}
@@ -227,7 +276,7 @@ export default function PomodoroPage() {
                 cy="128"
                 r="116"
                 strokeWidth="6"
-                stroke={mode === "focus" ? "#ea580c" : "#2563eb"}
+                stroke={themeColor}
                 fill="transparent"
                 strokeDasharray="728"
                 strokeDashoffset={728 - (728 * progressPercent) / 100}
