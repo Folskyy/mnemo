@@ -19,6 +19,7 @@ sys.modules['chromadb'] = MagicMock()
 os.environ["GROQ_API_KEY"] = "test-key"
 os.environ["GROQ_API_URL"] = "https://api.groq.com/openai/v1/chat/completions"
 os.environ["CHAT_MODEL"] = "llama3-8b-8192"
+os.environ["RAG_API_URL"] = "http://rag:8000"
 
 from api.routes.chat import stream_groq
 
@@ -64,7 +65,6 @@ async def test_stream_groq_error():
     assert "Error from Groq API (401)" in chunks[0]
 
 
-from unittest.mock import AsyncMock, MagicMock, patch
 from api.routes.chat import chat_endpoint, ChatPayload, MessageModel
 
 @pytest.mark.asyncio
@@ -82,34 +82,32 @@ async def test_chat_endpoint_references():
         headers={"Content-Type": "text/event-stream"}
     ))
 
-    mock_collection = MagicMock()
-    mock_collection.query.return_value = {
-        "documents": [["This is chunk content 1", "This is chunk content 2"]],
-        "metadatas": [[
-            {"filename": "document.pdf", "page": 3},
-            {"filename": "document.pdf", "page": 3},  # Duplicate
-        ]]
-    }
+    # Mock the RAG API retrieve call
+    rag_mock_url = "http://rag:8000/retrieve"
+    respx.post(rag_mock_url).mock(return_value=httpx.Response(
+        status_code=200,
+        json={
+            "context": "This is chunk content 1\n---\nThis is chunk content 2",
+            "references": [
+                {"filename": "document.pdf", "page": 3}
+            ]
+        }
+    ))
 
-    with patch("rag.retrieval.get_embedding", new_callable=AsyncMock) as mock_embed, \
-         patch("rag.retrieval.get_chroma_collection", return_value=mock_collection):
+    payload = ChatPayload(
+        message="Is it true?",
+        history=[MessageModel(role="user", content="Hello")]
+    )
+    
+    response = await chat_endpoint(payload)
+    
+    chunks = []
+    async for chunk in response.body_iterator:
+        chunks.append(chunk)
         
-        mock_embed.return_value = [0.1, 0.2, 0.3]
-        
-        payload = ChatPayload(
-            message="Is it true?",
-            history=[MessageModel(role="user", content="Hello")]
-        )
-        
-        response = await chat_endpoint(payload)
-        
-        chunks = []
-        async for chunk in response.body_iterator:
-            chunks.append(chunk)
-            
-        full_response = "".join(chunks)
-        assert "According to the PDF, yes." in full_response
-        assert "[REFERENCES_METADATA]:" in full_response
-        assert '"filename": "document.pdf"' in full_response
-        assert '"page": 3' in full_response
+    full_response = "".join(chunks)
+    assert "According to the PDF, yes." in full_response
+    assert "[REFERENCES_METADATA]:" in full_response
+    assert '"filename": "document.pdf"' in full_response
+    assert '"page": 3' in full_response
 
