@@ -12,7 +12,7 @@ from sqlmodel import Session
 from datetime import datetime, UTC
 from database import get_session
 from schemas.material import Material
-from rag.chroma import get_embedding, get_chroma_collection
+from rag.ingest import ingest_chunks
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
@@ -118,25 +118,13 @@ async def upload_material(
             os.remove(file_path)
         raise HTTPException(422, "Falha ao gerar trechos do documento.")
 
-    # 4. Embeddings + indexação no ChromaDB
-    collection = get_chroma_collection()
-    now = datetime.now(UTC).isoformat()
-
-    chunk_ids, embeddings, documents, metadatas = [], [], [], []
-    for i, chunk_data in enumerate(chunks_info):
-        chunk_ids.append(f"{file_id}_chunk_{i}")
-        embeddings.append(await get_embedding(chunk_data["text"]))
-        documents.append(chunk_data["text"])
-        metadatas.append({
-            "file_id": file_id,
-            "filename": file.filename,
-            "chunk_index": i,
-            "total_chunks": len(chunks_info),
-            "created_at": now,
-            "page": chunk_data["page"],
-        })
-    
-    collection.add(ids=chunk_ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
+    # 4. Embeddings + indexação no ChromaDB via RAG API
+    try:
+        await ingest_chunks(file_id, file.filename, chunks_info)
+    except Exception as e:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(500, f"Falha na ingestão do RAG: {e}")
 
     # 5. Salvar metadata no Postgres
     material = Material(

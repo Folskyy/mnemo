@@ -1,7 +1,6 @@
 import os
 import json
 import httpx
-import chromadb
 from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
@@ -11,11 +10,6 @@ from rag.retrieval import retrieve_context
 router = APIRouter(prefix="/chat", tags=["chat"])
 
 # Retrieve environment variables
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "ollama")
-OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
-CHROMA_HOST = os.getenv("CHROMA_HOST", "chromadb")
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
-EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHAT_MODEL = os.getenv("CHAT_MODEL")
 GROQ_API_KEY = os.getenv("GROQ_API_KEY") or os.getenv("GROQ_PROXY_API_KEY", "")
 GROQ_API_URL = os.getenv("GROQ_API_URL", "https://api.groq.com/openai/v1/chat/completions")
@@ -30,23 +24,6 @@ class MessageModel(BaseModel):
 class ChatPayload(BaseModel):
     message: str
     history: List[MessageModel]
-
-async def get_embedding(text: str) -> List[float]:
-    url = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/embed"
-    async with httpx.AsyncClient(timeout=30.0) as client:
-        try:
-            resp = await client.post(url, json={"model": EMBED_MODEL, "input": text})
-            resp.raise_for_status()
-            return resp.json()["embeddings"][0]
-        except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Failed to generate embedding: {e}")
-
-def get_chroma_collection(name: str = "mnemo"):
-    try:
-        client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-        return client.get_or_create_collection(name)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to connect to ChromaDB: {e}")
 
 async def stream_groq(prompt: str):
     if not GROQ_API_KEY:
