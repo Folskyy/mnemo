@@ -5,24 +5,18 @@ POST /materials — upload + ingestão RAG em uma única chamada
 
 import os
 import uuid
-import httpx
 import pymupdf as fitz  # pymupdf
-import chromadb
 
 from fastapi import APIRouter, Depends, UploadFile, File, HTTPException
 from sqlmodel import Session
 from datetime import datetime, UTC
 from database import get_session
 from schemas.material import Material
+from rag.chroma import get_embedding, get_chroma_collection
 
 router = APIRouter(prefix="/materials", tags=["materials"])
 
 CHROMA_UPLOAD_DIR = os.getenv("CHROMA_UPLOAD_DIR", "/app/data/documents")
-CHROMA_HOST = os.getenv("CHROMA_HOST", "chromadb")
-CHROMA_PORT = int(os.getenv("CHROMA_PORT", "8000"))
-OLLAMA_HOST = os.getenv("OLLAMA_HOST", "ollama")
-OLLAMA_PORT = os.getenv("OLLAMA_PORT", "11434")
-EMBED_MODEL = os.getenv("EMBED_MODEL", "nomic-embed-text")
 CHUNK_SIZE = 800
 CHUNK_OVERLAP = 80
 
@@ -44,19 +38,6 @@ def chunk_text(text: str, size: int = CHUNK_SIZE, overlap: int = CHUNK_OVERLAP) 
         start += size - overlap
     return [c for c in chunks if c]
 
-
-async def get_embedding(text: str) -> list[float]:
-    url = f"http://{OLLAMA_HOST}:{OLLAMA_PORT}/api/embed"
-    async with httpx.AsyncClient(timeout=30) as client:
-        resp = await client.post(url, json={"model": EMBED_MODEL, "input": text})
-        resp.raise_for_status()
-        return resp.json()["embeddings"][0]
-
-
-def get_chroma_collection(name: str = "mnemo"):
-    client = chromadb.HttpClient(host=CHROMA_HOST, port=CHROMA_PORT)
-    return client.get_or_create_collection(name)
-
 # ── endpoint ──────────────────────────────────────────────────────────────────
 
 @router.post("/", status_code=201)
@@ -65,47 +46,94 @@ async def upload_material(
     session: Session = Depends(get_session),
     # Futuramente: category_id: int | None = Form(None)
 ):
-    if file.content_type not in {"application/pdf", "text/plain"}:
-        raise HTTPException(400, f"Tipo não suportado: {file.content_type}")
+    filename = file.filename or ""
+    ext = os.path.splitext(filename)[1].lower()
+    
+    # Supported extensions
+    supported_extensions = {".pdf", ".docx", ".txt"}
+    
+    # Fallback checks based on content type
+    is_docx_mime = file.content_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+    is_pdf_mime = file.content_type == "application/pdf"
+    is_txt_mime = file.content_type == "text/plain"
+    
+    if ext not in supported_extensions:
+        if is_pdf_mime:
+            ext = ".pdf"
+        elif is_docx_mime:
+            ext = ".docx"
+        elif is_txt_mime:
+            ext = ".txt"
+        else:
+            raise HTTPException(400, f"Tipo de arquivo não suportado: {file.content_type or ext}. Envie PDF, DOCX ou TXT.")
 
     # 1. Salvar em disco
     os.makedirs(CHROMA_UPLOAD_DIR, exist_ok=True)
     file_id = str(uuid.uuid4())
-    ext = ".pdf" if file.content_type == "application/pdf" else ".txt"
     file_path = os.path.join(CHROMA_UPLOAD_DIR, f"{file_id}{ext}")
 
     content = await file.read()
     with open(file_path, "wb") as f:
         f.write(content)
 
-    # 2. Extrair texto
+    # 2. Extrair texto usando os parsers dedicados
+    pages = []
     try:
-        text = extract_text(file_path, file.content_type)
+        if ext == ".pdf":
+            from parsers.pdf import parse_pdf
+            pages = parse_pdf(file_path)
+        elif ext == ".docx":
+            from parsers.docx import parse_docx
+            text = parse_docx(file_path)
+            pages = [text]
+        else:  # .txt
+            with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
+                text = f.read()
+            pages = [text]
     except Exception as e:
-        os.remove(file_path)
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise HTTPException(422, f"Falha ao extrair texto: {e}")
 
-    if not text.strip():
+    total_chars = sum(len(p) for p in pages)
+    if total_chars == 0 or not any(p.strip() for p in pages):
+        if os.path.exists(file_path):
+            os.remove(file_path)
         raise HTTPException(422, "Documento sem texto extraível.")
 
-    # 3. Chunking
-    chunks = chunk_text(text)
+    # 3. Chunking page by page
+    chunks_info = []
+    for page_idx, page_text in enumerate(pages, start=1):
+        if not page_text.strip():
+            continue
+        page_chunks = chunk_text(page_text)
+        for chunk in page_chunks:
+            chunks_info.append({
+                "text": chunk,
+                "page": page_idx
+            })
+
+    if not chunks_info:
+        if os.path.exists(file_path):
+            os.remove(file_path)
+        raise HTTPException(422, "Falha ao gerar trechos do documento.")
 
     # 4. Embeddings + indexação no ChromaDB
     collection = get_chroma_collection()
     now = datetime.now(UTC).isoformat()
 
     chunk_ids, embeddings, documents, metadatas = [], [], [], []
-    for i, chunk in enumerate(chunks):
+    for i, chunk_data in enumerate(chunks_info):
         chunk_ids.append(f"{file_id}_chunk_{i}")
-        embeddings.append(await get_embedding(chunk))
-        documents.append(chunk)
+        embeddings.append(await get_embedding(chunk_data["text"]))
+        documents.append(chunk_data["text"])
         metadatas.append({
             "file_id": file_id,
             "filename": file.filename,
             "chunk_index": i,
-            "total_chunks": len(chunks),
+            "total_chunks": len(chunks_info),
             "created_at": now,
+            "page": chunk_data["page"],
         })
     
     collection.add(ids=chunk_ids, embeddings=embeddings, documents=documents, metadatas=metadatas)
@@ -116,8 +144,8 @@ async def upload_material(
         filename=file.filename,
         file_path=file_path,
         content_type=file.content_type,
-        chunk_count=len(chunks),
-        char_count=len(text),
+        chunk_count=len(chunks_info),
+        char_count=total_chars,
         created_at=datetime.now(UTC),
     )
     session.add(material)
@@ -126,7 +154,7 @@ async def upload_material(
     return {
         "id": file_id,
         "filename": file.filename,
-        "chunks_indexed": len(chunks),
-        "chars_extracted": len(text),
+        "chunks_indexed": len(chunks_info),
+        "chars_extracted": total_chars,
         "status": "indexed",
     }
