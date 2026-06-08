@@ -55,6 +55,21 @@ services:
     depends_on:
       - ollama
 
+  rag:
+    build: ./rag_api
+    container_name: rag
+    ports:
+      - "8002:8000"
+    volumes:
+      - ./rag_api:/app
+    depends_on:
+      chromadb:
+        condition: service_started
+      ollama:
+        condition: service_healthy
+    env_file:
+      - ./backend/.env
+
   api:
     build: ./backend
     container_name: api
@@ -66,10 +81,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
-      chromadb:
+      rag:
         condition: service_started
-      ollama:
-        condition: service_healthy
     env_file:
       - ./backend/.env
     extra_hosts:
