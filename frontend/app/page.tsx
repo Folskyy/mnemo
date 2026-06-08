@@ -116,9 +116,14 @@ export default function Home() {
   // ── Upload logic ────────────────────────────────────────────────────────────
 
   const uploadFile = async (file: File) => {
-    if (!["application/pdf", "text/plain"].includes(file.type)) {
+    const fileExt = file.name.split('.').pop()?.toLowerCase();
+    const isDocxMime = file.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+    const isPdfMime = file.type === "application/pdf";
+    const isTxtMime = file.type === "text/plain";
+    
+    if (!isPdfMime && !isTxtMime && !isDocxMime && !["pdf", "txt", "docx"].includes(fileExt || "")) {
       setUploadStatus("error");
-      setUploadError(`Tipo não suportado: ${file.type}. Use PDF ou TXT.`);
+      setUploadError(`Tipo não suportado. Use PDF, DOCX ou TXT.`);
       return;
     }
 
@@ -677,13 +682,13 @@ export default function Home() {
                   ) : (
                     <>
                       <h4 className="text-sm font-bold text-white mb-1">Arrastar e soltar arquivo</h4>
-                      <p className="text-xs text-slate-500 mb-6">Suporta PDF e TXT para extração de texto (Max 10MB)</p>
+                      <p className="text-xs text-slate-500 mb-6">Suporta PDF, DOCX e TXT para extração de texto (Max 10MB)</p>
                       <input
                         ref={fileInputRef}
                         type="file"
                         id="file-upload"
                         className="hidden"
-                        accept=".pdf,.txt,application/pdf,text/plain"
+                        accept=".pdf,.txt,.docx,application/pdf,text/plain,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                         onChange={handleFileInput}
                       />
                       <label

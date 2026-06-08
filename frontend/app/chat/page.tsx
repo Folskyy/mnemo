@@ -1,18 +1,23 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { ArrowLeft, Send, Sparkles, Bot, User, Trash2 } from "lucide-react"
+import { ArrowLeft, Send, Sparkles, Bot, User, Trash2, FileText } from "lucide-react"
 import Link from "next/link"
 import { Input } from "@/components/ui/input"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import ReactMarkdown from "react-markdown"
 import remarkGfm from "remark-gfm"
+import remarkMath from "remark-math"
+import rehypeKatex from "rehype-katex"
 import type { Components } from "react-markdown"
+import "katex/dist/katex.min.css"
+
 
 type Message = {
   role: "user" | "assistant"
   content: string
+  references?: { filename: string; page: number }[]
 }
 
 // ── Markdown component map ────────────────────────────────────────────────────
@@ -163,22 +168,68 @@ export default function ChatPage() {
       const reader = response.body.getReader()
       const decoder = new TextDecoder()
       let assistantText = ""
+      let parsedReferences: { filename: string; page: number }[] = []
 
       while (true) {
         const { done, value } = await reader.read()
         if (done) break
 
-        assistantText += decoder.decode(value)
+        assistantText += decoder.decode(value, { stream: true })
+
+        let cleanText = assistantText
+        const refIndex = assistantText.indexOf("[REFERENCES_METADATA]:")
+        if (refIndex !== -1) {
+          cleanText = assistantText.substring(0, refIndex).trim()
+          const jsonStr = assistantText.substring(refIndex + "[REFERENCES_METADATA]:".length)
+          try {
+            const parsed = JSON.parse(jsonStr)
+            if (parsed && Array.isArray(parsed.references)) {
+              parsedReferences = parsed.references
+            }
+          } catch (e) {
+            // JSON might be incomplete while streaming, ignore
+          }
+        }
 
         setMessages((prev) => {
           const updated = [...prev]
           const last = updated[updated.length - 1]
-          if (last?.role === "assistant") last.content = assistantText
+          if (last?.role === "assistant") {
+            last.content = cleanText
+            last.references = parsedReferences
+          }
           return updated
         })
 
         scrollToBottom()
       }
+
+      // Flush decoder
+      assistantText += decoder.decode()
+      let cleanText = assistantText
+      const refIndex = assistantText.indexOf("[REFERENCES_METADATA]:")
+      if (refIndex !== -1) {
+        cleanText = assistantText.substring(0, refIndex).trim()
+        const jsonStr = assistantText.substring(refIndex + "[REFERENCES_METADATA]:".length)
+        try {
+          const parsed = JSON.parse(jsonStr)
+          if (parsed && Array.isArray(parsed.references)) {
+            parsedReferences = parsed.references
+          }
+        } catch (e) {
+          console.error("Failed to parse references metadata JSON:", e)
+        }
+      }
+      setMessages((prev) => {
+        const updated = [...prev]
+        const last = updated[updated.length - 1]
+        if (last?.role === "assistant") {
+          last.content = cleanText
+          last.references = parsedReferences
+        }
+        return updated
+      })
+      scrollToBottom()
     } catch (error) {
       console.error("Streaming error:", error)
       setMessages((prev) => {
@@ -284,12 +335,38 @@ export default function ChatPage() {
                   {msg.content ? (
                     msg.role === "assistant" ? (
                       // ── Markdown só nas mensagens do assistente ──
-                      <ReactMarkdown
-                        remarkPlugins={[remarkGfm]}
-                        components={markdownComponents}
-                      >
-                        {msg.content}
-                      </ReactMarkdown>
+                      <>
+                        <ReactMarkdown
+                          remarkPlugins={[remarkGfm, remarkMath]}
+                          rehypePlugins={[rehypeKatex]}
+                          components={markdownComponents}
+                        >
+                          {msg.content}
+                        </ReactMarkdown>
+                        {msg.references && msg.references.length > 0 && (
+                          <div className="mt-4 pt-3 border-t border-slate-850 flex flex-col gap-2">
+                            <div className="flex items-center space-x-1.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                              <Sparkles className="h-3 w-3 text-blue-400 animate-pulse" />
+                              <span>Fontes consultadas</span>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {msg.references.map((ref, rIdx) => (
+                                <div
+                                  key={rIdx}
+                                  className="group flex items-center space-x-1.5 px-2.5 py-1 rounded-xl bg-slate-950/55 hover:bg-slate-950 border border-slate-800/80 hover:border-blue-500/40 text-[11px] text-slate-300 hover:text-white transition-all duration-200 cursor-default shadow-sm hover:shadow-blue-950/20"
+                                  title={`${ref.filename} - Página ${ref.page}`}
+                                >
+                                  <FileText className="h-3 w-3 text-blue-400 group-hover:text-blue-300 transition-colors" />
+                                  <span className="max-w-[120px] truncate font-medium">{ref.filename}</span>
+                                  <span className="text-[9px] font-bold font-mono px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 group-hover:bg-blue-500/25 group-hover:text-blue-300 border border-blue-500/20 transition-all duration-200">
+                                    p. {ref.page}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                      </>
                     ) : (
                       // ── Usuário: texto simples ──
                       <p className="leading-relaxed">{msg.content}</p>
