@@ -6,6 +6,7 @@ up:
 	@echo "Services started successfully!"
 	@echo "  Frontend:    http://localhost:3000"
 	@echo "  Backend API: http://localhost:8000"
+	@echo "  RAG API:     http://localhost:8002"
 	@echo "  ChromaDB:    http://localhost:8001"
 	@echo "  Ollama:      http://localhost:11435" -local-
 	@echo "==============================================\n"
