@@ -6,6 +6,7 @@ from fastapi import APIRouter, HTTPException
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from typing import List
+from rag.retrieval import retrieve_context
 
 router = APIRouter(prefix="/chat", tags=["chat"])
 
@@ -101,21 +102,8 @@ async def stream_groq(prompt: str):
 
 @router.post("")
 async def chat_endpoint(payload: ChatPayload):
-    # 1. Embed the query message
-    query_vector = await get_embedding(payload.message)
-    
-    # 2. Query ChromaDB for top 5 chunks
-    collection = get_chroma_collection()
-    try:
-        results = collection.query(
-            query_embeddings=[query_vector],
-            n_results=5
-        )
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Failed to query ChromaDB: {e}")
-        
-    retrieved_chunks = results.get("documents", [[]])[0] if results else []
-    context = "\n---\n".join(retrieved_chunks)
+    # 1. Retrieve context and references using decoupled RAG module
+    context, references = await retrieve_context(payload.message, n_results=5)
     
     # 3. Format the conversation history
     history_str = "\n".join([f"{msg.role}: {msg.content}" for msg in payload.history])
@@ -123,20 +111,29 @@ async def chat_endpoint(payload: ChatPayload):
     # 4. Build prompt using template
     prompt = f"""You are a study assistant. Answer based on the user's materials.
 
-Retrieved context from the materials:
+===Retrieved context from the materials:
 {context}
 
-Conversation history:
+===Conversation history:
 {history_str}
 
-Question: {payload.message}"""
+===Question: {payload.message}"""
 
     # print("--- PROMPT SENT TO GROQ PROXY ---")
     # print(prompt)
     # print("-----------------------------")
 
+    async def response_generator():
+        async for chunk in stream_groq(prompt):
+            yield chunk
+        # Yield references at the end of the stream
+        ref_payload = {
+            "references": references
+        }
+        yield f"\n\n[REFERENCES_METADATA]:{json.dumps(ref_payload)}"
+
     return StreamingResponse(
-        stream_groq(prompt),
+        response_generator(),
         media_type="text/event-stream",
         headers={"X-Content-Type-Options": "nosniff"}
     )
